@@ -76,6 +76,19 @@ solution = solve_ivp(equations, time_span, initial_conditions, t_eval=time_eval,
 # Анимация
 fig, ax = plt.subplots(figsize=(10, 6))
 
+# Создаем объекты для анимации
+# "брусок"
+block_width, block_height = 0.1, 0.2
+block = plt.Rectangle((-block_width/2, -block_height/2), 
+                      block_width, block_height, 
+                      color='gray', zorder=5)
+ax.add_patch(block)
+
+# Рисуем "стенки"
+left_wall = plt.plot([-1.5 - block_width / 2 - 0.03, -1.5 - block_width / 2 - 0.03], [-0.5, -1.2], color='k', linewidth=1)
+right_wall = plt.plot([-1.5 + block_width / 2 + 0.03, -1.5 + block_width / 2 + 0.03], [-0.5, -1.2], color='k', linewidth=1)
+
+
 rod1, = ax.plot([], [], 'o-', lw=2, markersize=10)
 rod2, = ax.plot([], [], 'o-', lw=2, markersize=10)
 spring_line, = ax.plot([], [], 'b-', lw=2)
@@ -85,11 +98,40 @@ ax.set_ylim(-rod_length1 - rod_length2 - 0.5, rod_length1 + rod_length2 + 0.5)
 ax.set_aspect('equal')
 ax.grid(True)
 
+# Функция для вычисления координат зигзага
+def get_spring_zigzag(x_start, y_start, x_end, y_end, turns=8, amplitude=0.1):
+    # Делаем разбиение по длине
+    num_points = 2 * turns + 1
+    xs = np.linspace(x_start, x_end, num_points)
+    ys = np.linspace(y_start, y_end, num_points)
+    # Смещаем точки по нормали для зигзага
+    zigzag_x = []
+    zigzag_y = []
+    for i in range(num_points):
+        # пропорция вдоль пружины
+        t = i / (num_points - 1)
+        # направление
+        dx = x_end - x_start
+        dy = y_end - y_start
+        length = np.sqrt(dx**2 + dy**2)
+        # нормаль
+        nx = -dy / length
+        ny = dx / length
+        # смещение
+        offset = amplitude if i % 2 == 1 else -amplitude
+        # координаты
+        zx = xs[i] + offset * nx
+        zy = ys[i] + offset * ny
+        zigzag_x.append(zx)
+        zigzag_y.append(zy)
+    return zigzag_x, zigzag_y
+
 def init():
     rod1.set_data([], [])
     rod2.set_data([], [])
     spring_line.set_data([], [])
-    return rod1, rod2, spring_line
+    block.set_xy((-block_width/2, -block_height/2))
+    return rod1, rod2, spring_line, block
 
 def update(frame):
     phi, psi, omega1, omega2 = solution.y[:, frame]
@@ -101,10 +143,15 @@ def update(frame):
     
     rod1.set_data([0, x1], [0, y1])
     rod2.set_data([x1, x2], [y1, y2])
+
+    # Зигзаг от центра (там где брусок) до первой массы
+    zx, zy = get_spring_zigzag(-1.5, y1, x1, y1, turns=6, amplitude=0.05)
+    spring_line.set_data(zx, zy)
+
+    # Брусок в конце пружины
+    block.set_xy((-1.5 - block_width/2, y1 - block_height/2))
     
-    spring_line.set_data([-1.5, x1], [y1, y1])
-    
-    return rod1, rod2, spring_line
+    return rod1, rod2, spring_line, block
 
 ani = FuncAnimation(fig, update, frames=len(time_eval), init_func=init, blit=True, interval=5)
 

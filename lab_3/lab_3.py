@@ -95,24 +95,68 @@ ax.set_ylim(-1.2, 1.2)
 ax.set_aspect('equal')
 ax.grid()
 
+# Создаем объекты для анимации
+# "брусок"
+block_width, block_height = 0.05, 0.1
+block = plt.Rectangle((-block_width/2, -block_height/2), 
+                      block_width, block_height, 
+                      color='gray', zorder=5)
+ax.add_patch(block)
+
+# Рисуем "стенки"
+left_wall = plt.plot([-0.5 - block_width / 2 - 0.015, -0.5 - block_width / 2 - 0.015], [-0.25, -0.7], color='k', linewidth=1)
+right_wall = plt.plot([-0.5 + block_width / 2 + 0.015, -0.5 + block_width / 2 + 0.015], [-0.25, -0.7], color='k', linewidth=1)
+
 line, = ax.plot([], [], 'o-', lw=2)
 spring, = ax.plot([], [], '-', lw=1, color='red')
+
+# Функция для вычисления координат зигзага
+def get_spring_zigzag(x_start, y_start, x_end, y_end, turns=8, amplitude=0.1):
+    # Делаем разбиение по длине
+    num_points = 2 * turns + 1
+    xs = np.linspace(x_start, x_end, num_points)
+    ys = np.linspace(y_start, y_end, num_points)
+    # Смещаем точки по нормали для зигзага
+    zigzag_x = []
+    zigzag_y = []
+    for i in range(num_points):
+        # пропорция вдоль пружины
+        t = i / (num_points - 1)
+        # направление
+        dx = x_end - x_start
+        dy = y_end - y_start
+        length = np.sqrt(dx**2 + dy**2)
+        # нормаль
+        nx = -dy / length
+        ny = dx / length
+        # смещение
+        offset = amplitude if i % 2 == 1 else -amplitude
+        # координаты
+        zx = xs[i] + offset * nx
+        zy = ys[i] + offset * ny
+        zigzag_x.append(zx)
+        zigzag_y.append(zy)
+    return zigzag_x, zigzag_y
 
 # Инициализация анимации
 def init():
     line.set_data([], [])
     spring.set_data([], [])
-    return line, spring
+    block.set_xy((-block_width/2, -block_height/2))
+    return line, spring, block
 
 # Обновление кадров
 def update(frame):
     this_x = [0, x1[frame], x2[frame]]
     this_y = [0, y1[frame], y2[frame]]
-    spring_x = [-0.5, x1[frame]]
-    spring_y = [y1[frame], y1[frame]]
     line.set_data(this_x, this_y)
-    spring.set_data(spring_x, spring_y)
-    return line, spring
+    # Зигзаг от центра (там где брусок) до первой массы
+    zx, zy = get_spring_zigzag(-0.5, y1[frame], x1[frame], y1[frame], turns=6, amplitude=0.02)
+    spring.set_data(zx, zy)
+
+    # Брусок в конце пружины
+    block.set_xy((-0.5 - block_width/2, y1[frame] - block_height/2))
+    return line, spring, block
 
 ani = FuncAnimation(fig, update, frames=len(t_eval), init_func=init, blit=True, interval=20)
 
